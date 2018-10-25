@@ -1,0 +1,37 @@
+{
+  "processors" : [
+    {
+      "gsub": {
+        "field": "@message",
+        "pattern": "\n",
+        "replacement": ""
+      }
+    },
+    {
+      "grok" : {
+        "field" : "@message",
+        "patterns" : ["# User@Host: %{WORD:user}\\[%{WORD}\\] @ %{WORD:host}?%{SPACE}?\\[%{IP:ip}\\]%{SPACE}Id:%{SPACE}%{NUMBER:id}%{SPACE}# Query_time: %{NUMBER:query_time:float}%{SPACE}Lock_time: %{NUMBER:lock_time:float}%{SPACE}Rows_sent: %{NUMBER:rows_sent:int}%{SPACE}Rows_examined: %{NUMBER:rows_examined:int}%{SPACE}(use %{WORD:database};%{SPACE})?(SET timestamp=%{NUMBER:timestamp:int};%{SPACE})?%{GREEDYDATA:sql}"],
+        "ignore_failure" : true
+      }
+    },
+    {
+      "date": {
+        "field": "timestamp",
+        "formats": ["UNIX"],
+        "ignore_failure" : true
+      }
+    },
+    {
+      "remove": {
+        "field": ["timestamp", "@message"],
+        "ignore_failure" : true
+      }
+    },
+    {
+      "set": {
+        "field": "db_instance",
+        "value": "{{@log_stream}}"
+      }
+    }
+  ]
+}
