@@ -2,12 +2,16 @@
 var https = require('https');
 var zlib = require('zlib');
 var crypto = require('crypto');
+var AWS = require('aws-sdk')
 
-var endpoint = '[ESS HOST]';
+var endpoint = process.env['ESS_HOST'];
 var pipeline = 'slowquerylog';
 var query_string = 'pipeline=' + pipeline;
 
 exports.handler = function(input, context) {
+    if (endpoint === undefined) {
+      throw new TypeError("env.ESS_HOST is not set");
+    }
     // decode input from base64
     var zippedInput = new Buffer(input.awslogs.data, 'base64');
 
@@ -61,12 +65,13 @@ function transform(payload) {
     payload.logEvents.forEach(function(logEvent) {
         var timestamp = new Date(1 * logEvent.timestamp);
 
-        // index name format: cwl-YYYY.MM.DD
+        // index name format: []-YYYY-MM-DD
         var indexName = [
-            'cwl-' + timestamp.getUTCFullYear(),              // year
+            payload.logGroup,
+            timestamp.getUTCFullYear(),              // year
             ('0' + (timestamp.getUTCMonth() + 1)).slice(-2),  // month
             ('0' + timestamp.getUTCDate()).slice(-2)          // day
-        ].join('.');
+        ].join('-');
 
         var source = buildSource(logEvent.message, logEvent.extractedFields);
         source['@id'] = logEvent.id;
@@ -140,7 +145,8 @@ function isNumeric(n) {
 }
 
 function post(body, callback) {
-    var requestParams = buildRequest(endpoint, body);
+    var credential = resolve_aws_credential();
+    var requestParams = buildRequest(endpoint, body, credential);
 
     var request = https.request(requestParams, function(response) {
         var responseBody = '';
@@ -168,7 +174,7 @@ function post(body, callback) {
                 "statusCode": response.statusCode,
                 "responseBody": responseBody
             } : null;
-
+]
             callback(error, success, response.statusCode, failedItems);
         });
     }).on('error', function(e) {
@@ -177,13 +183,17 @@ function post(body, callback) {
     request.end(requestParams.body);
 }
 
-function buildRequest(endpoint, body) {
+function resolve_aws_credential() {
+    // TODO: implement by using credential_provider_chain
+}
+
+function buildRequest(endpoint, body, credential) {
     var endpointParts = endpoint.match(/^([^\.]+)\.?([^\.]*)\.?([^\.]*)\.amazonaws\.com$/);
     var region = endpointParts[2];
     var service = endpointParts[3];
     var datetime = (new Date()).toISOString().replace(/[:\-]|\.\d{3}/g, '');
     var date = datetime.substr(0, 8);
-    var kDate = hmac('AWS4' + process.env.AWS_SECRET_ACCESS_KEY, date);
+    var kDate = hmac('AWS4' + credential.secret_access_key, date);
     var kRegion = hmac(kDate, region);
     var kService = hmac(kRegion, service);
     var kSigning = hmac(kService, 'aws4_request');
@@ -197,7 +207,7 @@ function buildRequest(endpoint, body) {
             'Content-Type': 'application/json',
             'Host': endpoint,
             'Content-Length': Buffer.byteLength(body),
-            'X-Amz-Security-Token': process.env.AWS_SESSION_TOKEN,
+            'X-Amz-Security-Token': credential.session_token,
             'X-Amz-Date': datetime
         }
     };
@@ -231,11 +241,12 @@ function buildRequest(endpoint, body) {
     ] .join('\n');
 
     request.headers.Authorization = [
-        'AWS4-HMAC-SHA256 Credential=' + process.env.AWS_ACCESS_KEY_ID + '/' + credentialString,
+        'AWS4-HMAC-SHA256 Credential=' + credential.access_key_id + '/' + credentialString,
         'SignedHeaders=' + signedHeaders,
         'Signature=' + hmac(kSigning, stringToSign, 'hex')
     ].join(', ');
     request.path = request.path + '?' + query_string;
+    console.log(request);
     return request;
 }
 

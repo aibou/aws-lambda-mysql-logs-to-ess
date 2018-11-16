@@ -1,0 +1,21 @@
+{
+  "messageType": "DATA_MESSAGE",
+  "owner": "123456789123",
+  "logGroup": "aurora-cluster-name",
+  "logStream": "db-instance-identifier",
+  "subscriptionFilters": [
+    "testFilter"
+  ],
+  "logEvents": [
+    {
+      "id": "eventId1",
+      "timestamp": 1440442987000,
+      "message": "# Time: 2018-10-24T03:10:33.305538Z\n# User@Host: aibou[aibou] @ [192.168.0.1] Id: 4314371\n# Query_time: 1.435536 Lock_time: 0.000044 Rows_sent: 1571657 Rows_examined: 1571657\nSET timestamp=1540350633;\nSELECT `users`.`*` FROM `users`;"
+    },
+    {
+      "id": "eventId2",
+      "timestamp": 1440442987001,
+      "message": "# Time: 2018-10-24T03:11:33.305538Z\n# User@Host: aibou[aibou] @ [192.168.0.1] Id: 4314371\n# Query_time: 4.238494 Lock_time: 0.000044 Rows_sent: 1571657 Rows_examined: 1571657\nSET timestamp=1540350693;\nSELECT `users`.`*` FROM `users`;"
+    }
+  ]
+}
